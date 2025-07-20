@@ -20,6 +20,29 @@ const init = async () => {
       password TEXT,
       rol TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS equipos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT,
+      descripcion TEXT,
+      creador_id INTEGER,
+      FOREIGN KEY(creador_id) REFERENCES usuarios(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS usuarios_equipos (
+      usuario_id INTEGER,
+      equipo_id INTEGER,
+      FOREIGN KEY(usuario_id) REFERENCES usuarios(id),
+      FOREIGN KEY(equipo_id) REFERENCES equipos(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS invitaciones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT,
+      equipo_id INTEGER,
+      estado TEXT DEFAULT 'pendiente',
+      FOREIGN KEY(equipo_id) REFERENCES equipos(id)
+    );
   `);
 
   console.log(`Base de datos ${existsSync(DB_FILE) ? 'actualizada' : 'creada'}: ${DB_FILE}`);
