@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import NavBar from '/src/components/NavBar.jsx';
 
 const CrearEquipo = () => {
   const [nombre, setNombre] = useState('');
@@ -46,6 +47,8 @@ const CrearEquipo = () => {
   };
 
   return (
+    <>
+    <NavBar />
     <div style={styles.container}>
       <div style={styles.card}>
         <h1>Crear Nuevo Equipo</h1>
@@ -68,11 +71,13 @@ const CrearEquipo = () => {
         </form>
       </div>
     </div>
+    </>
   );
 };
 
 const styles = {
   container: {
+    paddingTop: '80px',
     minHeight: '100vh',
     display: 'flex',
     justifyContent: 'center',

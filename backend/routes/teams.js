@@ -49,6 +49,77 @@ router.post('/equipos', async (req, res) => {
   }
 });
 
+// GET /api/equipos/:id/miembros
+router.get('/equipos/:id/miembros', async (req, res) => {
+  const equipoId = req.params.id;
+  const db = await initDb();
+
+  try {
+    // Check if user has access (either student in team or creator)
+    const isMember = await db.get(
+      `SELECT 1 FROM usuarios_equipos WHERE usuario_id = ? AND equipo_id = ?`,
+      [req.user.id, equipoId]
+    );
+
+    const isCreator = await db.get(
+      `SELECT 1 FROM equipos WHERE id = ? AND creador_id = ?`,
+      [equipoId, req.user.id]
+    );
+
+    if (!isMember && !isCreator) {
+      return res.status(403).json({ message: 'No tienes acceso a este equipo' });
+    }
+
+    const miembros = await db.all(
+      `SELECT u.id, u.nombre, u.apellido, u.email
+       FROM usuarios u
+       JOIN usuarios_equipos ue ON u.id = ue.usuario_id
+       WHERE ue.equipo_id = ?`,
+      [equipoId]
+    );
+
+    res.json({ miembros });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al obtener los miembros del equipo' });
+  }
+});
+
+
+// DELETE /api/equipos/:id/miembros/:userId
+router.delete('/equipos/:id/miembros/:userId', async (req, res) => {
+  const equipoId = req.params.id;
+  const userIdToRemove = req.params.userId;
+  const db = await initDb();
+
+  try {
+    // Verify creator permission
+    const isCreator = await db.get(
+      `SELECT 1 FROM equipos WHERE id = ? AND creador_id = ?`,
+      [equipoId, req.user.id]
+    );
+
+    if (!isCreator) {
+      return res.status(403).json({ message: 'Solo el creador del equipo puede eliminar miembros' });
+    }
+
+    // Don't allow removing yourself
+    if (req.user.id === parseInt(userIdToRemove)) {
+      return res.status(400).json({ message: 'No puedes eliminarte a ti mismo' });
+    }
+
+    await db.run(
+      `DELETE FROM usuarios_equipos WHERE usuario_id = ? AND equipo_id = ?`,
+      [userIdToRemove, equipoId]
+    );
+
+    res.json({ message: 'Miembro eliminado del equipo' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al eliminar miembro' });
+  }
+});
+
 
 // GET /api/mis-equipos
 router.get('/mis-equipos', async (req, res) => {
@@ -102,5 +173,108 @@ router.get('/mis-invitaciones', async (req, res) => {
     res.status(500).json({ message: 'Error al obtener invitaciones' });
   }
 });
+
+// PATCH /api/invitaciones/:id/aceptar
+router.patch('/invitaciones/:id/aceptar', async (req, res) => {
+  const inviteId = req.params.id;
+  const db = await initDb();
+
+  try {
+    // Get invite and current user
+    const invite = await db.get(
+      `SELECT * FROM invitaciones WHERE id = ? AND estado = 'pendiente'`,
+      inviteId
+    );
+    if (!invite || !invite.email) return res.status(404).json({ message: 'Invitación no encontrada' });
+
+    const user = await db.get(`SELECT * FROM usuarios WHERE id = ?`, req.user.id);
+    if (user.email !== invite.email)
+      return res.status(403).json({ message: 'No tienes permiso para aceptar esta invitación' });
+
+    // Add user to team
+    await db.run(
+      `INSERT INTO usuarios_equipos (usuario_id, equipo_id) VALUES (?, ?)`,
+      req.user.id,
+      invite.equipo_id
+    );
+
+    // Mark invitation as accepted
+    await db.run(`UPDATE invitaciones SET estado = 'aceptada' WHERE id = ?`, inviteId);
+
+    res.json({ message: 'Invitación aceptada' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al aceptar invitación' });
+  }
+});
+
+// PATCH /api/invitaciones/:id/rechazar
+router.patch('/invitaciones/:id/rechazar', async (req, res) => {
+  const inviteId = req.params.id;
+  const db = await initDb();
+
+  try {
+    const invite = await db.get(
+      `SELECT * FROM invitaciones WHERE id = ? AND estado = 'pendiente'`,
+      inviteId
+    );
+    if (!invite || !invite.email) return res.status(404).json({ message: 'Invitación no encontrada' });
+
+    const user = await db.get(`SELECT * FROM usuarios WHERE id = ?`, req.user.id);
+    if (user.email !== invite.email)
+      return res.status(403).json({ message: 'No tienes permiso para rechazar esta invitación' });
+
+    await db.run(`UPDATE invitaciones SET estado = 'rechazada' WHERE id = ?`, inviteId);
+
+    res.json({ message: 'Invitación rechazada' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al rechazar invitación' });
+  }
+});
+
+// POST /api/invitaciones — enviar invitación (solo teachers)
+router.post('/invitaciones', async (req, res) => {
+  const { email, equipo_id } = req.body;
+
+  if (req.user.rol !== 'teacher') {
+    return res.status(403).json({ message: 'Solo los profesores pueden enviar invitaciones' });
+  }
+
+  if (!email || !equipo_id) {
+    return res.status(400).json({ message: 'Email y equipo requeridos' });
+  }
+
+  try {
+    const db = await initDb();
+
+    // Verificar que el equipo pertenece al profesor
+    const team = await db.get(`SELECT * FROM equipos WHERE id = ? AND creador_id = ?`, [equipo_id, req.user.id]);
+    if (!team) {
+      return res.status(403).json({ message: 'No tienes permiso para invitar a este equipo' });
+    }
+
+    // Verificar si ya existe una invitación pendiente para ese email y equipo
+    const existing = await db.get(
+      `SELECT * FROM invitaciones WHERE email = ? AND equipo_id = ? AND estado = 'pendiente'`,
+      [email, equipo_id]
+    );
+    if (existing) {
+      return res.status(409).json({ message: 'Ya existe una invitación pendiente para este usuario' });
+    }
+
+    // Insertar nueva invitación
+    await db.run(
+      `INSERT INTO invitaciones (email, equipo_id) VALUES (?, ?)`,
+      [email, equipo_id]
+    );
+
+    res.json({ message: 'Invitación enviada correctamente' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al enviar invitación' });
+  }
+});
+
 
 export default router;

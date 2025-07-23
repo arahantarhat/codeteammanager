@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import NavBar from '/src/components/NavBar.jsx';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
   const [user, setUser] = useState(null);
@@ -39,6 +41,8 @@ const Index = () => {
   }
 
   return (
+    <>
+    <NavBar />
     <div style={styles.container}>
       <div style={styles.card}>
         <h1>Bienvenido, {user.nombre}</h1>
@@ -60,7 +64,7 @@ const Index = () => {
 
                 <button
                 onClick={() => window.location.href = '/crear-equipo'}
-                style={{ ...styles.button, marginBottom: '20px' }}
+                style={{ ...styles.linkButton, marginBottom: '20px' }}
                 >
                 Crear nuevo equipo
                 </button>
@@ -72,6 +76,7 @@ const Index = () => {
 
       </div>
     </div>
+    </>
   );
 };
 
@@ -80,34 +85,91 @@ const TeamList = ({ teams }) => (
     {teams.length === 0 ? (
       <li>No hay equipos</li>
     ) : (
-        teams.map((team) => <li key={team.id}>{team.nombre}</li>)
+      teams.map((team) => (
+        <li key={team.id}>
+          <Link to={`/equipo/${team.id}`} style={{ color: '#667eea', fontWeight: 'bold' }}>
+            {team.nombre}
+          </Link>
+        </li>
+      ))
     )}
   </ul>
 );
 
-const PendingInvites = ({ invites }) => (
-  <ul>
-    {invites.length === 0 ? (
-      <li>No tienes invitaciones pendientes</li>
-    ) : (
-      invites.map((invite, idx) => <li key={idx}>{invite}</li>)
-    )}
-  </ul>
-);
+const PendingInvites = ({ invites }) => {
+  const token = localStorage.getItem('token');
+
+  const handleInviteAction = async (id, action) => {
+    try {
+      const res = await fetch(`/api/invitaciones/${id}/${action}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      alert(data.message);
+      location.reload();
+    } catch (err) {
+      alert('Error al procesar la invitación');
+    }
+  };
+
+  return (
+    <ul>
+      {invites.length === 0 ? (
+        <li>No tienes invitaciones pendientes</li>
+      ) : (
+        invites.map((invite) => (
+          <li key={invite.id} style={{ marginBottom: '10px' }}>
+            {invite.equipo}
+            <div style={{ marginTop: '5px' }}>
+              <button onClick={() => handleInviteAction(invite.id, 'aceptar')} style={styles.smallBtn}>Aceptar</button>
+              <button onClick={() => handleInviteAction(invite.id, 'rechazar')} style={styles.smallBtn}>Rechazar</button>
+            </div>
+          </li>
+        ))
+      )}
+    </ul>
+  );
+};
+
 
 const InviteForm = ({ teams }) => {
   const [email, setEmail] = useState('');
   const [selectedTeam, setSelectedTeam] = useState(teams[0] || '');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTeam) {
       alert('Selecciona un equipo');
       return;
     }
 
-    alert(`Invitación enviada a ${email} para el equipo ${selectedTeam}`);
-    setEmail('');
+    const token = localStorage.getItem('token');
+
+    try {
+    const res = await fetch('/api/invitaciones', {
+        method: 'POST',
+        headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+        email,
+        equipo_id: selectedTeam
+        })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+        alert(data.message);
+        setEmail('');
+    } else {
+        alert(data.message || 'Error al enviar la invitación');
+    }
+    } catch (err) {
+    alert('Error de red al enviar la invitación');
+    }
+
   };
 
   return (
@@ -182,7 +244,29 @@ const styles = {
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer'
-  }
+  },
+  linkButton: {
+  display: 'inline-block',
+  backgroundColor: '#228f40',
+  color: 'white',
+  padding: '10px 20px',
+  borderRadius: '6px',
+  textDecoration: 'none',
+  fontWeight: 'bold',
+  marginBottom: '20px'
+},
+smallBtn: {
+  marginRight: '8px',
+  padding: '5px 10px',
+  fontSize: '12px',
+  backgroundColor: '#667eea',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer'
+}
+
+
 };
 
 export default Index;
