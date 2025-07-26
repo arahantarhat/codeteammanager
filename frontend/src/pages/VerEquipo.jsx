@@ -10,6 +10,8 @@ const VerEquipo = () => {
   const navigate = useNavigate();
   const [nuevoProblema, setNuevoProblema] = useState('');
   const [mensajeProblema, setMensajeProblema] = useState('');
+  const [problemas, setProblemas] = useState([]);
+
 
 
   useEffect(() => {
@@ -42,6 +44,14 @@ const VerEquipo = () => {
         alert('Error al cargar los miembros');
         navigate('/index');
       });
+
+    fetch(`/api/equipos/${id}/problemas`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => setProblemas(data.problemas || []))
+      .catch(() => console.error('Error al cargar problemas'));
+
   }, [id, navigate]);
 
   const handleEliminar = async (userId) => {
@@ -132,7 +142,25 @@ const VerEquipo = () => {
               {mensajeProblema && <p>{mensajeProblema}</p>}
             </>
           )}
-
+          <h3 style={{ marginTop: '30px' }}>Problemas asignados</h3>
+          {problemas.length === 0 ? (
+            <p>No hay problemas asignados aún.</p>
+          ) : (
+            <ul>
+              {problemas.map((p) => (
+                <li key={p.id} style={{ marginBottom: '8px' }}>
+                  <a
+                    href={`https://codeforces.com/contest/${p.contest_id}/problem/${p.indice}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#3182ce', fontWeight: 'bold' }}
+                  >
+                    {p.codeforces_id}: {p.nombre}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </>

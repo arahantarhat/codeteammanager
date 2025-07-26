@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const NavBar = () => {
   const navigate = useNavigate();
@@ -11,10 +11,12 @@ const NavBar = () => {
 
   return (
     <nav style={styles.nav}>
-        <div style={styles.inner}>
-        <h2 style={styles.logo}>CodeTeam Manager</h2>
+      <div style={styles.inner}>
+        <Link to="/index" style={styles.logoLink}>
+          CodeTeam
+        </Link>
         <button onClick={handleLogout} style={styles.button}>Cerrar sesión</button>
-        </div>
+      </div>
     </nav>
   );
 
@@ -34,8 +36,11 @@ const styles = {
     zIndex: 1000,
     boxSizing: 'border-box'
   },
-  logo: {
-    margin: 0
+  logoLink: {
+    color: 'white',
+    textDecoration: 'none',
+    fontSize: '1.5rem',
+    fontWeight: 'bold'
   },
   button: {
     backgroundColor: '#667eea',

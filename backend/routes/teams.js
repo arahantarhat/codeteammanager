@@ -330,4 +330,41 @@ router.post('/equipos/:id/problemas', async (req, res) => {
 });
 
 
+// GET /api/equipos/:id/problemas — obtener problemas asignados (miembros o creador)
+router.get('/equipos/:id/problemas', async (req, res) => {
+  const equipoId = req.params.id;
+  const db = await initDb();
+
+  try {
+    const isMember = await db.get(
+      `SELECT 1 FROM usuarios_equipos WHERE usuario_id = ? AND equipo_id = ?`,
+      [req.user.id, equipoId]
+    );
+
+    const isCreator = await db.get(
+      `SELECT 1 FROM equipos WHERE id = ? AND creador_id = ?`,
+      [equipoId, req.user.id]
+    );
+
+    if (!isMember && !isCreator) {
+      return res.status(403).json({ message: 'No tienes acceso a este equipo' });
+    }
+
+    const problemas = await db.all(
+      `SELECT id, nombre, contest_id, indice, codeforces_id, fecha_asignacion
+       FROM problemas_asignados
+       WHERE equipo_id = ?
+       ORDER BY fecha_asignacion DESC`,
+      [equipoId]
+    );
+
+    res.json({ problemas });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al obtener los problemas asignados' });
+  }
+});
+
+
+
 export default router;
