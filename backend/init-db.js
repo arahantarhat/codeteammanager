@@ -43,6 +43,17 @@ const init = async () => {
       estado TEXT DEFAULT 'pendiente',
       FOREIGN KEY(equipo_id) REFERENCES equipos(id)
     );
+    
+    CREATE TABLE IF NOT EXISTS problemas_asignados (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipo_id INTEGER,
+      nombre TEXT,
+      contest_id INTEGER,
+      indice TEXT,
+      codeforces_id TEXT,
+      fecha_asignacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(equipo_id) REFERENCES equipos(id)
+    );
   `);
 
   console.log(`Base de datos ${existsSync(DB_FILE) ? 'actualizada' : 'creada'}: ${DB_FILE}`);

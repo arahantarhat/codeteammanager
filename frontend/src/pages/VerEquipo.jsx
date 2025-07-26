@@ -8,6 +8,9 @@ const VerEquipo = () => {
   const [user, setUser] = useState(null);
   const [esCreador, setEsCreador] = useState(false);
   const navigate = useNavigate();
+  const [nuevoProblema, setNuevoProblema] = useState('');
+  const [mensajeProblema, setMensajeProblema] = useState('');
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -63,6 +66,33 @@ const VerEquipo = () => {
     }
   };
 
+  const handleAsignarProblema = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+
+    try {
+      const res = await fetch(`/api/equipos/${id}/problemas`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ problemId: nuevoProblema })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setMensajeProblema(data.message);
+        setNuevoProblema('');
+      } else {
+        setMensajeProblema(data.message || 'Error');
+      }
+    } catch (err) {
+      setMensajeProblema('Error de red al asignar problema');
+    }
+  };
+
+
   return (
     <>
       <NavBar />
@@ -85,6 +115,24 @@ const VerEquipo = () => {
               ))}
             </ul>
           )}
+          {esCreador && (
+            <>
+              <h3 style={{ marginTop: '30px' }}>Asignar problema</h3>
+              <form onSubmit={handleAsignarProblema} style={styles.form}>
+                <input
+                  type="text"
+                  placeholder="Código de problema (ej. 1234A)"
+                  value={nuevoProblema}
+                  onChange={(e) => setNuevoProblema(e.target.value)}
+                  required
+                  style={styles.input}
+                />
+                <button type="submit" style={styles.assignBtn}>Asignar</button>
+              </form>
+              {mensajeProblema && <p>{mensajeProblema}</p>}
+            </>
+          )}
+
         </div>
       </div>
     </>
@@ -123,7 +171,29 @@ const styles = {
     padding: '6px 12px',
     borderRadius: '6px',
     cursor: 'pointer'
+  },
+  form: {
+    marginTop: '10px',
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center'
+  },
+  input: {
+    flex: 1,
+    padding: '8px',
+    fontSize: '14px',
+    border: '2px solid #ccc',
+    borderRadius: '6px'
+  },
+  assignBtn: {
+    backgroundColor: '#3182ce',
+    color: 'white',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    cursor: 'pointer'
   }
+
 };
 
 export default VerEquipo;

@@ -1,6 +1,7 @@
 import express from 'express';
 import { initDb } from '../db/db.js';
 import jwt from 'jsonwebtoken';
+import fetch from 'node-fetch'; 
 
 const router = express.Router();
 
@@ -273,6 +274,58 @@ router.post('/invitaciones', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error al enviar invitación' });
+  }
+});
+
+// POST /api/equipos/:id/problemas — asignar problema (solo teachers)
+router.post('/equipos/:id/problemas', async (req, res) => {
+  const equipoId = req.params.id;
+  const { problemId } = req.body; // e.g. "1234A"
+  const db = await initDb();
+
+  if (req.user.rol !== 'teacher') {
+    return res.status(403).json({ message: 'Solo los profesores pueden asignar problemas' });
+  }
+
+  try {
+    // Verificar que el equipo pertenece al profesor
+    const team = await db.get(`SELECT * FROM equipos WHERE id = ? AND creador_id = ?`, [equipoId, req.user.id]);
+    if (!team) {
+      return res.status(403).json({ message: 'No tienes permiso para asignar problemas a este equipo' });
+    }
+
+    // Validar problema con la API de Codeforces
+    const match = problemId.match(/^(\d+)([A-Z][0-9A-Z]*)$/i);
+    if (!match) return res.status(400).json({ message: 'Formato de problema inválido (ej: 1234A)' });
+
+    const [_, contestId, index] = match;
+    const apiUrl = `https://codeforces.com/api/problemset.problems`;
+    const response = await fetch(apiUrl);
+    const json = await response.json();
+
+    if (json.status !== 'OK') return res.status(400).json({ message: 'Error consultando Codeforces' });
+
+    const allProblems = json.result.problems;
+    const problem = allProblems.find(p => p.contestId == contestId && p.index.toUpperCase() === index.toUpperCase());
+
+    if (!problem) {
+      return res.status(404).json({ message: 'Problema no encontrado en Codeforces' });
+    }
+
+    const nombre = problem.name;
+
+    // Guardar en la base de datos
+    await db.run(
+      `INSERT INTO problemas_asignados (equipo_id, nombre, contest_id, indice, codeforces_id)
+       VALUES (?, ?, ?, ?, ?)`,
+      [equipoId, nombre, contestId, index.toUpperCase(), `${contestId}${index.toUpperCase()}`]
+    );
+
+    res.json({ message: `Problema '${nombre}' asignado correctamente` });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al asignar problema' });
   }
 });
 
